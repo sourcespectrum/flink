@@ -31,11 +31,12 @@ import static org.junit.Assert.assertFalse;
 public class OneofRowToProtoTest {
     @Test
     public void testSimple() throws Exception {
-        RowData row = GenericRowData.of(1, 2);
+        RowData row = GenericRowData.of(1, 2, null);
 
         byte[] bytes = ProtobufTestHelper.rowToPbBytes(row, OneofTest.class);
         OneofTest oneofTest = OneofTest.parseFrom(bytes);
         assertFalse(oneofTest.hasA());
         assertEquals(2, oneofTest.getB());
+        assertEquals(OneofTest.TestOneofCase.B, oneofTest.getTestOneofCase());
     }
 }

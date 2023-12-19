@@ -24,6 +24,7 @@ import org.apache.flink.table.data.RowData;
 import org.junit.Test;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
 /** Test conversion of proto one_of data to flink internal data. */
@@ -32,6 +33,25 @@ public class OneofProtoToRowTest {
     public void testSimple() throws Exception {
         OneofTest oneofTest = OneofTest.newBuilder().setA(1).setB(2).build();
         RowData row = ProtobufTestHelper.pbBytesToRow(OneofTest.class, oneofTest.toByteArray());
+        assertTrue(row.isNullAt(0));
+        assertEquals(2, row.getInt(1));
+
+        byte[] bytes = ProtobufTestHelper.rowToPbBytes(row, OneofTest.class);
+        OneofTest oneofTestRestored = OneofTest.parseFrom(bytes);
+        assertFalse(oneofTestRestored.hasA());
+        assertEquals(2, oneofTestRestored.getB());
+        assertEquals(OneofTest.TestOneofCase.B, oneofTestRestored.getTestOneofCase());
+    }
+
+    @Test
+    public void testReadDefaultValues() throws Exception {
+        OneofTest oneofTest = OneofTest.newBuilder().setA(1).setB(2).build();
+        RowData row =
+                ProtobufTestHelper.pbBytesToRow(
+                        OneofTest.class,
+                        oneofTest.toByteArray(),
+                        new PbFormatConfig(OneofTest.class.getName(), false, true, ""),
+                        false);
         assertTrue(row.isNullAt(0));
         assertEquals(2, row.getInt(1));
     }

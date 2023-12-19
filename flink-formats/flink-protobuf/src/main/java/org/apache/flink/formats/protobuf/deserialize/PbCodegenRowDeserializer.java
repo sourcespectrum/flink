@@ -69,14 +69,16 @@ public class PbCodegenRowDeserializer implements PbCodegenDeserializer {
             PbCodegenDeserializer codegen =
                     PbCodegenDeserializeFactory.getPbCodegenDes(elementFd, subType, formatContext);
             appender.appendLine("Object " + flinkRowEleVar + " = null");
-            if (!formatContext.getPbFormatConfig().isReadDefaultValues()) {
+            boolean hasContainingOneOf = elementFd.getContainingOneof() != null;
+            if (!formatContext.getPbFormatConfig().isReadDefaultValues() || hasContainingOneOf) {
                 // only works in syntax=proto2 and readDefaultValues=false
                 // readDefaultValues must be true in pb3 mode
                 String isMessageElementNonEmptyCode =
                         isMessageElementNonEmptyCode(
                                 pbMessageVar,
                                 strongCamelFieldName,
-                                PbFormatUtils.isRepeatedType(subType));
+                                PbFormatUtils.isRepeatedType(subType),
+                                hasContainingOneOf);
                 appender.begin("if(" + isMessageElementNonEmptyCode + "){");
             }
             String pbGetMessageElementCode =
@@ -89,7 +91,7 @@ public class PbCodegenRowDeserializer implements PbCodegenDeserializer {
                     codegen.codegen(
                             flinkRowEleVar, pbGetMessageElementCode, appender.currentIndent());
             appender.appendSegment(code);
-            if (!formatContext.getPbFormatConfig().isReadDefaultValues()) {
+            if (!formatContext.getPbFormatConfig().isReadDefaultValues() || hasContainingOneOf) {
                 appender.end("}");
             }
             appender.appendLine(
@@ -114,12 +116,16 @@ public class PbCodegenRowDeserializer implements PbCodegenDeserializer {
     }
 
     private String isMessageElementNonEmptyCode(
-            String message, String fieldName, boolean isListOrMap) {
-        if (isListOrMap) {
-            return message + ".get" + fieldName + "Count() > 0";
+            String message, String fieldName, boolean isListOrMap, boolean hasContainingOneOf) {
+        String listOrMapCondition = message + ".get" + fieldName + "Count() > 0";
+        // proto syntax class does not have a hasName() interface
+        String oneofOrOptionalCondition = message + ".has" + fieldName + "()";
+        if (hasContainingOneOf && isListOrMap) {
+            return oneofOrOptionalCondition + " && " + listOrMapCondition;
+        } else if (isListOrMap) {
+            return listOrMapCondition;
         } else {
-            // proto syntax class do not have hasName() interface
-            return message + ".has" + fieldName + "()";
+            return oneofOrOptionalCondition;
         }
     }
 }
